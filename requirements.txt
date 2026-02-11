@@ -1,0 +1,19 @@
+fastapi[standard]
+sqlmodel
+asyncpg
+psycopg2-binary
+alembic
+pydantic-settings
+structlog
+redis
+celery
+flower
+prometheus-fastapi-instrumentator
+sentry-sdk[fastapi,celery]
+# Testing & Dev
+pytest
+pytest-asyncio
+httpx
+factory-boy
+ruff
+email-validator
