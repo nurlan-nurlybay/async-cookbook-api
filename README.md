@@ -47,13 +47,14 @@ This spins up the API, DB, Redis, Worker, Prometheus, and Grafana automatically.
 docker compose up -d --build
 ```
 
-- **API Docs:** http://localhost:8000/docs
-- **Grafana:** http://localhost:3000 (admin/admin)
-- **Prometheus:** http://localhost:9090
+**Access points:**
+- API Docs: http://localhost:8000/docs
+- Grafana: http://localhost:3000 (admin/admin)
+- Prometheus: http://localhost:9090
 
 ### 2. Run Tests
 
-The test suite uses an in-memory SQLite database and Mocks, so it runs instantly without needing the heavy Docker stack.
+The test suite uses an in-memory SQLite database and Mocks, so it runs instantly.
 
 ```bash
 # Install dependencies
@@ -63,32 +64,72 @@ pip install -r requirements.txt
 pytest -v
 ```
 
-## 🧪 Testing Strategy
+## 🎓 Homework 2: Structural & Quality Testing
 
-The project includes a robust test suite with 45 assertions:
+This section documents the advanced testing methodologies implemented for the second homework assignment, focusing on Basis-Path Testing, Mutation Testing, and Table-Based Testing.
 
-- **test_recipes.py:**
-    - **Parameterized Testing:** Validates edge cases (empty names, negative cooking times).
-    - **Security:** Verifies 401 Unauthorized vs 403 Forbidden responses.
-    - **Cascade Delete:** Ensures deleting a Recipe removes its Ingredients.
+### Task 1: Structural Basis-Path Testing
 
-- **test_subscribers.py:**
-    - **Validation:** Rejects malformed emails (missing @, empty strings) with 422.
-    - **Business Logic:** Prevents duplicate subscriptions (409 Conflict).
+We performed structural analysis on two core functions to ensure 100% logical coverage. Flowcharts were generated to identify independent basis paths, satisfying a Cyclomatic Complexity (V(G)) of 4 and 5 respectively.
 
-- **test_worker.py:**
-    - **Mocking:** Tests the email service logic without sending real emails.
-    - **Ranking Algorithm:** Verifies the worker correctly identifies top-viewed recipes.
+#### 1. app.api.services.newsletter.send_weekly_email
 
-## 📊 Monitoring
+**Complexity:** 4
 
-The application exposes Prometheus metrics at `/metrics`.
+**Testing Goal:** Validate the newsletter workflow including recipe fetching, subscriber extraction, and exception handling.
 
-- **Custom Metric:** `total_subscribers_added_total` (Counter) tracks growth.
-- **Latency:** Tracks HTTP request duration and status codes.
+![send_weekly_email Function Flowchart](func1.png)
 
-## 🔒 Security
+#### 2. app.api.v1.recipes.update_recipe
 
-- **Middleware:** Custom middleware to log request timing and catch unhandled exceptions.
-- **Authentication:** Admin routes are protected via `X-Admin-Key` header.
-- **Validation:** Inputs are sanitized via Pydantic models (e.g., `cooking_time > 0`).
+**Complexity:** 5
+
+**Testing Goal:** Validate the API endpoint logic including object existence checks, early returns for empty data, and conditional logging for "Popular" recipes (views > 50).
+
+![update_recipe Function Flowchart](func2.png)
+
+### Task 2: Mutation Testing
+
+We intentionally introduced 10 "mutants" (logical errors) into [app/api/v1/subscribers.py](app/api/v1/subscribers.py) to evaluate the robustness of our unit test suite.
+
+#### Mutation Results
+
+| # | Mutant Logic | Expected Impact | Test Result |
+|----|---|---|---|
+| 1 | == to != in duplicate check | Logic error in query | Killed (Failed) |
+| 2 | if result to if False | Bypass duplicate check | Killed (Failed) |
+| 3 | Remove session.add() | Data never enters session | Killed (Failed) |
+| 4 | commit() to pass | Data never saved to DB | Killed (Failed) |
+| 5 | if not sub to if sub | Logic inversion on delete | Killed (Failed) |
+| 6 | session.delete() to pass | Record remains in DB | Survived (Passed) |
+| 7 | Remove @Depends auth | Security bypass | Survived (Passed) |
+| 8 | 201_CREATED to 200_OK | API Contract violation | Killed (Failed) |
+| 9 | raise NotFound to pass | Error hidden on 404 | Survived (Passed) |
+| 10 | return all() to return [] | Data masking | Survived (Passed) |
+
+#### Analysis of Survivors
+
+The survival of Mutants 6, 7, 9, and 10 identified specific gaps in our test suite:
+
+- **State vs. Status:** Mutant 6 survived because the test only verified the 204 status code but did not check the database state to ensure the row was actually deleted.
+
+- **Missing Negative Tests:** Mutant 9 survived because the suite lacks "Negative Testing"—we only tested successful unsubscribes, not the behavior when a user is missing.
+
+- **Endpoint Coverage:** Mutants 7 and 10 survived because the Admin GET endpoint was not called by any existing unit test, leaving that specific logic entirely unvalidated.
+
+### Task 3: Table-Based Testing
+
+We utilized a Decision Table to systematically map the logical branches of the `update_recipe` method. This approach ensures all combinations of inputs are validated against their expected outcomes.
+
+#### Decision Table
+
+| Case # | Condition: Recipe Exists | Condition: Data Provided | Condition: Views > 50 | Action: Expected Result | Action: DB Commit |
+|--------|--------------------------|--------------------------|----------------------|------------------------|------------------|
+| 1 | No | Don't Care | Don't Care | Raise 404 NotFound | No |
+| 2 | Yes | No | Don't Care | Return Original Object | No |
+| 3 | Yes | Yes | Yes | Log Popularity + Update | Yes |
+| 4 | Yes | Yes | No | Standard Update | Yes |
+
+#### Implementation Note
+
+These scenarios are implemented in [tests/test_hw2_structural.py](tests/test_hw2_structural.py) using `pytest.mark.parametrize`, allowing the data table to drive the test execution independently from the test logic.

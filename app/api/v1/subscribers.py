@@ -44,7 +44,7 @@ async def unsubscribe(email: str, session: SessionDep):
     
     if not subscriber:
         logger.warning("unsubscribe_failed_not_found", email=email)
-        raise NotFoundException(detail="Subscriber not found")
+        raise NotFoundException(detail="Subscriber not found") 
         
     await session.delete(subscriber)
     await session.commit()
@@ -59,6 +59,7 @@ async def get_subscribers(session: SessionDep):
     statement = select(Subscriber)
     # CHANGE: .execute() instead of .exec()
     result = await session.execute(statement)
+    # return []
     return result.scalars().all()
 
 """

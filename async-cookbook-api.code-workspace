@@ -16,7 +16,6 @@
         "files.autoSave": "afterDelay", // off or afterDelay
         "files.autoSaveDelay": 1000,
         "json.schemaDownload.enable": false,
-        "sqlite.sqlite3": "/usr/bin/sqlite3",
 
         "terminal.integrated.scrollback": 10000,
         "python.analysis.typeCheckingMode": "standard"

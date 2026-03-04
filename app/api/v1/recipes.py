@@ -47,22 +47,27 @@ async def get_recipe_detail(recipe_id: int, session: SessionDep):
     await session.refresh(recipe)
     return recipe
 
+
 @router.patch("/{recipe_id}", response_model=RecipeRead, dependencies=[Depends(get_admin_user)])
 async def update_recipe(recipe_id: int, recipe_in: RecipeUpdate, session: SessionDep):
     recipe = await session.get(Recipe, recipe_id)
+    
     if not recipe:
-        logger.warning("update_failed_not_found", recipe_id=recipe_id)
         raise NotFoundException()
 
     update_data = recipe_in.model_dump(exclude_unset=True)
+    if not update_data:
+        return recipe
+
+    # Business Rule - High traffic protection (Complexity +1)
+    if recipe.views > 50:
+        logger.info("updating_popular_recipe", recipe_id=recipe_id)
+
     for key, value in update_data.items():
         setattr(recipe, key, value)
 
-    session.add(recipe)
     await session.commit()
     await session.refresh(recipe)
-    
-    logger.info("recipe_updated", recipe_id=recipe_id, updated_fields=list(update_data.keys()))
     return recipe
 
 

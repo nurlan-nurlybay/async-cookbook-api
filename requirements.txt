@@ -17,3 +17,5 @@ httpx
 factory-boy
 ruff
 email-validator
+aiosqlite
+pytest-mock
